@@ -63,10 +63,11 @@ function pane(strip,T,metric,chance){
     `<div class="ctrl"><span>axes</span>${PAIRS.map((q,i)=>`<button data-p="${i}">${VN[q[0]]} × ${VN[q[1]]}</button>`).join('')}</div>`+
     `<div class="ctrl" data-fix></div>`+
     (T.ex.length?`<div class="ctrl"><span>${T.exname}</span>${T.ex.map((e,i)=>`<button data-e="${i}">${e}</button>`).join('')}</div>`:'')+
-    `<canvas></canvas><div class="tip"></div>`;
+    `<div class="ctrl"><button data-vals>show values</button><button data-reset>reset</button></div><canvas></canvas><div class="tip"></div>`;
   strip.appendChild(card);
   const cv=card.querySelector('canvas'),tip=card.querySelector('.tip'),fixDiv=card.querySelector('[data-fix]');
-  let pi=0,fixv={ch:T.ch[T.ch.length-1],fs:T.fs[T.fs.length-1],bits:T.bits[T.bits.length-1]};
+  const FIX0={ch:T.ch[T.ch.length-1],fs:T.fs[T.fs.length-1],bits:T.bits[T.bits.length-1]};
+  let pi=0,fixv={...FIX0},showv=false;
   let ex=T.ex.length?T.ex.length-1:-1,az=-0.9,el=0.5,zoom=1,drawn=false,proj=[];
   const fixVar=()=>['ch','fs','bits'].find(v=>!PAIRS[pi].includes(v));
   function buildFix(){const f=fixVar();fixDiv.innerHTML=`<span>${VN[f]}</span>`+L[f].map(v=>`<button data-f="${v}">${v}</button>`).join('');
@@ -76,6 +77,9 @@ function pane(strip,T,metric,chance){
     card.querySelectorAll('[data-e]').forEach(x=>x.classList.toggle('on',+x.dataset.e===ex));};
   card.querySelectorAll('[data-p]').forEach(x=>x.onclick=()=>{pi=+x.dataset.p;buildFix();setBtn();draw();});
   card.querySelectorAll('[data-e]').forEach(x=>x.onclick=()=>{ex=+x.dataset.e;setBtn();draw();});
+  card.querySelector('[data-vals]').onclick=e=>{showv=!showv;card.querySelector('[data-vals]').classList.toggle('on',showv);draw();};
+  card.querySelector('[data-reset]').onclick=()=>{pi=0;fixv={...FIX0};ex=T.ex.length?T.ex.length-1:-1;az=-0.9;el=0.5;zoom=1;showv=false;
+    card.querySelector('[data-vals]').classList.toggle('on',false);buildFix();setBtn();draw();};
   buildFix();setBtn();
   function P(x,y,z,W,H){const ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
     const X=x*ca-y*sa,Y=x*sa+y*ca;const Yr=Y*ce-z*se,Z=Y*se+z*ce;const s=Math.min(W,H)*0.33*zoom;return [W/2+X*s,H/2-Z*s,Yr];}
@@ -95,22 +99,21 @@ function pane(strip,T,metric,chance){
     g.font='12px system-ui';g.fillStyle='#1d1d1b';
     let q=P(0,-1.45,-0.8,W,H);g.fillText(VN[vx],q[0],q[1]);q=P(1.5,0,-0.8,W,H);g.fillText(VN[vy],q[0],q[1]);
     q=P(-1.12,1.12,0.98,W,H);g.fillText(metric,q[0],q[1]);
-    const quads=[],N=6,zc=zv(chance);
-    for(let a=0;a<N;a++)for(let b=0;b<N;b++){const x0=-1+2*a/N,x1=-1+2*(a+1)/N,y0=-1+2*b/N,y1=-1+2*(b+1)/N;
-      const pts=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]].map(([x,y])=>P(x,y,zc,W,H));
-      quads.push({pts,depth:pts.reduce((s,p)=>s+p[2],0)/4,plane:true});}
+    const zc=zv(chance),lo=[],hi=[];
     for(let i=0;i<nx-1;i++)for(let j=0;j<ny-1;j++){const c=[[i,j],[i+1,j],[i+1,j+1],[i,j+1]],v=c.map(([a,b])=>get(a,b));
       if(v.some(x=>x===undefined))continue;const pts=c.map(([a,b],k)=>P(xv(a),yv(b),zv(v[k][0]),W,H));
-      quads.push({pts,depth:pts.reduce((s,p)=>s+p[2],0)/4,val:v.reduce((s,x)=>s+x[0],0)/4});}
-    quads.sort((a,b)=>b.depth-a.depth);
-    quads.forEach(Q=>{g.beginPath();Q.pts.forEach((p,k)=>k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();
-      if(Q.plane){g.fillStyle='rgba(214,69,65,.16)';g.fill();}
-      else{g.fillStyle=color((Q.val-chance)/(1-chance));g.fill();g.strokeStyle='rgba(255,255,255,.9)';g.stroke();}});
+      const Q={pts,depth:pts.reduce((s,p)=>s+p[2],0)/4,val:v.reduce((s,x)=>s+x[0],0)/4};(Q.val<chance?lo:hi).push(Q);}
+    const surf=L=>{L.sort((a,b)=>b.depth-a.depth);L.forEach(Q=>{g.beginPath();Q.pts.forEach((p,k)=>k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();
+      g.fillStyle=color((Q.val-chance)/(1-chance));g.fill();g.strokeStyle='rgba(255,255,255,.9)';g.lineWidth=1;g.stroke();});};
+    const plane=()=>{const pc=box.map(p=>P(p[0],p[1],zc,W,H));g.beginPath();pc.forEach((p,k)=>k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.closePath();
+      g.fillStyle='rgba(120,120,120,.18)';g.fill();g.setLineDash([5,4]);g.strokeStyle='#c0392b';g.lineWidth=1.3;g.stroke();g.setLineDash([]);};
+    if(el>=0){surf(lo);plane();surf(hi);}else{surf(hi);plane();surf(lo);}
     q=P(1,-1,zc,W,H);g.font='11px system-ui';g.fillStyle='#b8322f';g.textAlign='left';g.fillText(`chance ${chance.toFixed(2)}`,q[0]+6,q[1]);
     proj=[];
     for(let i=0;i<nx;i++)for(let j=0;j<ny;j++){const v=get(i,j);if(v===undefined)continue;
       const p=P(xv(i),yv(j),zv(v[0]),W,H);const c={};c[vx]=X[i];c[vy]=Y[j];c[vf]=fixv[vf];proj.push({p,c,v});
-      g.beginPath();g.arc(p[0],p[1],2.6,0,7);g.fillStyle='#0d366b';g.fill();}
+      g.beginPath();g.arc(p[0],p[1],2.6,0,7);g.fillStyle='#0d366b';g.fill();
+      if(showv){g.font='10px system-ui';g.textAlign='left';g.lineWidth=3;g.strokeStyle='rgba(255,255,255,.9)';g.strokeText(v[0].toFixed(2),p[0]+4,p[1]-4);g.fillStyle='#1d1d1b';g.fillText(v[0].toFixed(2),p[0]+4,p[1]-4);}}
     drawn=true;}
   let drag=null;
   cv.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY,az,el];cv.setPointerCapture(e.pointerId);});
