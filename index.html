@@ -82,23 +82,31 @@ function pane(strip,T,metric,chance){
     card.querySelector('[data-vals]').classList.toggle('on',false);buildFix();setBtn();draw();};
   buildFix();setBtn();
   function P(x,y,z,W,H){const ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
-    const X=x*ca-y*sa,Y=x*sa+y*ca;const Yr=Y*ce-z*se,Z=Y*se+z*ce;const s=Math.min(W,H)*0.33*zoom;return [W/2+X*s,H/2-Z*s,Yr];}
+    const X=x*ca-y*sa,Y=x*sa+y*ca;const Yr=Y*ce-z*se,Z=Y*se+z*ce;const s=Math.min(W,H)*0.29*zoom;return [W/2+X*s,H/2-Z*s,Yr];}
   function draw(){
     const dpr=window.devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
     cv.width=W*dpr;cv.height=H*dpr;const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,W,H);
     const [vx,vy]=PAIRS[pi],vf=fixVar(),X=L[vx],Y=L[vy],nx=X.length,ny=Y.length;
-    const xv=i=>nx>1?-1+2*i/(nx-1):0,yv=j=>ny>1?-1+2*j/(ny-1):0,zv=v=>-0.8+1.6*v;
+    const xv=i=>nx>1?-1+2*i/(nx-1):0,yv=j=>ny>1?-1+2*j/(ny-1):0,zv=v=>-1+2*v;
     const get=(i,j)=>{const c={};c[vx]=X[i];c[vy]=Y[j];c[vf]=fixv[vf];return T.pts[`${c.ch}_${c.fs}_${c.bits}`+(ex>=0?`_${ex}`:'')];};
-    g.strokeStyle='#d6d5cf';g.lineWidth=1;const box=[[-1,-1],[1,-1],[1,1],[-1,1]];
-    for(const zz of [-0.8,0.8]){g.beginPath();box.forEach((p,k)=>{const q=P(p[0],p[1],zz,W,H);k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]);});g.closePath();g.stroke();}
-    box.forEach(p=>{const a=P(p[0],p[1],-0.8,W,H),b=P(p[0],p[1],0.8,W,H);g.beginPath();g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1]);g.stroke();});
+    const box=[[-1,-1],[1,-1],[1,1],[-1,1]],ZT=[0,0.25,0.5,0.75,1];
+    const seg=(a,b)=>{const p=P(...a,W,H),q=P(...b,W,H);g.beginPath();g.moveTo(p[0],p[1]);g.lineTo(q[0],q[1]);g.stroke();};
+    // back walls = the x- and y-walls farther from the viewer; floor always drawn
+    const sx=P(1,0,0,W,H)[2]>P(-1,0,0,W,H)[2]?1:-1, sy=P(0,1,0,W,H)[2]>P(0,-1,0,W,H)[2]?1:-1, sz=el>=0?-1:1;
+    g.strokeStyle='#e9e8e3';g.lineWidth=1;
+    for(let i=0;i<nx;i++){seg([xv(i),-1,sz],[xv(i),1,sz]);seg([xv(i),sy,-1],[xv(i),sy,1]);}
+    for(let j=0;j<ny;j++){seg([-1,yv(j),sz],[1,yv(j),sz]);seg([sx,yv(j),-1],[sx,yv(j),1]);}
+    ZT.forEach(v=>{const z=zv(v);seg([-1,sy,z],[1,sy,z]);seg([sx,-1,z],[sx,1,z]);});
+    g.strokeStyle='#c9c7c0';g.lineWidth=1;
+    for(const zz of [-1,1]){g.beginPath();box.forEach((p,k)=>{const q=P(p[0],p[1],zz,W,H);k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]);});g.closePath();g.stroke();}
+    box.forEach(p=>seg([p[0],p[1],-1],[p[0],p[1],1]));
     g.fillStyle='#6b6a65';g.font='11px system-ui';g.textAlign='center';
-    X.forEach((c,i)=>{const q=P(xv(i),-1.18,-0.8,W,H);g.fillText(c,q[0],q[1]);});
-    Y.forEach((f,j)=>{const q=P(1.2,yv(j),-0.8,W,H);g.fillText(f,q[0],q[1]);});
-    for(let k=0;k<=4;k++){const v=k/4,q=P(-1.12,1.12,zv(v),W,H);g.fillText(v.toFixed(2),q[0],q[1]);}
+    X.forEach((c,i)=>{const q=P(xv(i),-1.18,-1,W,H);g.fillText(c,q[0],q[1]);});
+    Y.forEach((f,j)=>{const q=P(1.2,yv(j),-1,W,H);g.fillText(f,q[0],q[1]);});
+    for(let k=0;k<=4;k++){const v=k/4,q=P(-1.14,1.14,zv(v),W,H);g.fillText(v.toFixed(2),q[0],q[1]);}
     g.font='12px system-ui';g.fillStyle='#1d1d1b';
-    let q=P(0,-1.45,-0.8,W,H);g.fillText(VN[vx],q[0],q[1]);q=P(1.5,0,-0.8,W,H);g.fillText(VN[vy],q[0],q[1]);
-    q=P(-1.12,1.12,0.98,W,H);g.fillText(metric,q[0],q[1]);
+    let q=P(0,-1.45,-1,W,H);g.fillText(VN[vx],q[0],q[1]);q=P(1.5,0,-1,W,H);g.fillText(VN[vy],q[0],q[1]);
+    q=P(-1.12,1.12,1.16,W,H);g.fillText(metric,q[0],q[1]);
     const zc=zv(chance),lo=[],hi=[];
     for(let i=0;i<nx-1;i++)for(let j=0;j<ny-1;j++){const c=[[i,j],[i+1,j],[i+1,j+1],[i,j+1]],v=c.map(([a,b])=>get(a,b));
       if(v.some(x=>x===undefined))continue;const pts=c.map(([a,b],k)=>P(xv(a),yv(b),zv(v[k][0]),W,H));
